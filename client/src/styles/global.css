@@ -1,0 +1,33 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+  }
+  
+  .header, .footer {
+    background-color: #1976d2;
+    color: white;
+    padding: 10px;
+    text-align: center;
+  }
+  
+  button {
+    margin-left: 10px;
+  }
+
+  @keyframes rotate {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .rotating-o {
+    display: inline-block;
+    animation: rotate 2s linear infinite;
+    color: #f39c12; /* Optional: Different color for the "O" */
+  }
+  
+  
+  
