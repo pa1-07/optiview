@@ -22,7 +22,7 @@ router.get('/allData', protect, authorize('admin'), getAllData);
 router.get('/export/:sheetId', protect, authorize('admin'), exportSheet);
 router.post('/:sheetId/row', protect, authorize('admin'), addRow);
 router.delete('/:sheetId/row/:rowIndex', protect, authorize('admin'), deleteRow);
-router.delete('/sheets/:sheetId', protect, authorize('admin'), deleteSheet);
+router.delete('/:sheetId', protect, authorize('admin'), deleteSheet);
 
 
 module.exports = router;

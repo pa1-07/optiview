@@ -13,7 +13,7 @@ import {
   TextField,
   Modal,
 } from "@mui/material";
-import { DataGrid } from "@mui/x-data-grid";
+import { DataGrid  } from "@mui/x-data-grid";
 import { Upload, Download, Delete, Search } from "@mui/icons-material";
 import api from "../services/apiService";
 import { API } from "../services/apiEndpoints";
@@ -25,6 +25,8 @@ const AdminDashboard = () => {
   const [search, setSearch] = useState(""); // Row-level search
   const [sheetId, setSheetId] = useState("");
   const [allSheets, setAllSheets] = useState([]);
+ 
+
   const [dropdownSearch, setDropdownSearch] = useState(""); // Sheet dropdown search
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -146,16 +148,24 @@ const AdminDashboard = () => {
         message: "File imported successfully",
         severity: "success",
       });
+
+      // Fetch updated sheet data and set the new sheet
       await fetchAllSheets();
       const newSheetId = response.data.sheetId;
       setSheetId(newSheetId);
       await fetchAllData();
+
+      // Reset the file input to allow re-importing the same file or another file
+      e.target.value = null;
     } catch (error) {
       setSnackbar({
         open: true,
         message: "Failed to import file",
         severity: "error",
       });
+
+      // Reset the file input in case of error
+      e.target.value = null;
     }
   };
 
@@ -168,29 +178,42 @@ const AdminDashboard = () => {
       });
       return;
     }
-
+  
     try {
-      const response = await api.get(
-        `${API.EXPORT_SHEET.replace(":sheetId", sheetId)}`,
-        {
-          responseType: "blob",
-        }
+      // Get filtered and sorted rows
+      const visibleRows = getFilteredRows(); // Use the existing function to get the visible rows
+      const exportData = visibleRows.map((row) =>
+        columns.reduce((acc, col) => {
+          acc[col.headerName] = row[col.field] || ""; // Match column header with data
+          return acc;
+        }, {})
       );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+  
+      // Convert data to CSV format
+      const csvContent = [
+        columns.map((col) => col.headerName).join(","), // Header row
+        ...exportData.map((row) =>
+          columns.map((col) => JSON.stringify(row[col.headerName])).join(",")
+        ), // Data rows
+      ].join("\n");
+  
+      // Create a Blob and trigger download
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `${sheetId}.xlsx`);
+      link.setAttribute("download", `OPT_Data_${sheetId}.csv`);
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
-
+      document.body.removeChild(link);
+  
       setSnackbar({
         open: true,
         message: "File downloaded successfully",
         severity: "success",
       });
     } catch (error) {
+      console.error("Export error:", error);
       setSnackbar({
         open: true,
         message: "Failed to download file",
@@ -198,6 +221,8 @@ const AdminDashboard = () => {
       });
     }
   };
+  
+  
 
   return (
     <Box
@@ -235,16 +260,28 @@ const AdminDashboard = () => {
             displayEmpty
             variant="outlined"
             style={{
-              minWidth: "150px",
-              maxWidth: "180px",
+              minWidth: "180px", // Adjust width for better visibility
             }}
             MenuProps={{
               PaperProps: {
-                style: { maxHeight: 300, overflowY: "auto" }, // Adjusted dropdown modal size
+                style: {
+                  maxHeight: 300,
+                  width: 230, // Align dropdown width
+                  overflowY: "auto",
+                  marginTop: 8, // Space between input and dropdown
+                },
               },
             }}
+            renderValue={(selected) => {
+              if (!selected) return "Select a sheet"; // Placeholder text
+              const selectedSheet = allSheets.find(
+                (sheet) => sheet.sheetId === selected
+              );
+              return selectedSheet ? selectedSheet.sheetName : "Select a sheet";
+            }}
           >
-            <MenuItem >
+            {/* Search Bar Inside Dropdown */}
+            <MenuItem>
               <TextField
                 size="small"
                 placeholder="Search Sheets..."
@@ -258,13 +295,21 @@ const AdminDashboard = () => {
                   ),
                 }}
                 fullWidth
+                autoFocus // Automatically focus on the search bar
+                onClick={(e) => e.stopPropagation()} // Prevent dropdown from closing
               />
             </MenuItem>
-            {getFilteredSheets().map((sheet) => (
-              <MenuItem key={sheet.sheetId} value={sheet.sheetId}>
-                {sheet.sheetName}
-              </MenuItem>
-            ))}
+
+            {/* Filtered Sheet List */}
+            {getFilteredSheets().length > 0 ? (
+              getFilteredSheets().map((sheet) => (
+                <MenuItem key={sheet.sheetId} value={sheet.sheetId}>
+                  {sheet.sheetName}
+                </MenuItem>
+              ))
+            ) : (
+              <MenuItem>No sheets found</MenuItem>
+            )}
           </Select>
 
           <TextField
@@ -319,8 +364,9 @@ const AdminDashboard = () => {
 
       <Box
         sx={{
-          height: "70vh",
-          overflowY: "auto",
+          height: "70vh", // Fixed height for consistent layout
+          width: "100%", // Full container width
+          overflow: "auto", // Enable both horizontal and vertical scrollbars
           border: "1px solid #ddd",
           borderRadius: "5px",
           backgroundColor: "#fff",
@@ -337,10 +383,21 @@ const AdminDashboard = () => {
           </Box>
         ) : (
           <DataGrid
-            rows={getFilteredRows()}
+            rows={getFilteredRows()} // Apply external search filter first
             columns={columns}
             pageSize={100}
             rowsPerPageOptions={[100]}
+            autoHeight={false}
+            disableExtendRowFullWidth
+            componentsProps={{
+              basePopper: {
+                disablePortal: true, // Ensure no portal-based detachments
+              },
+              virtualScroller: {
+                role: "presentation", // Avoid unnecessary focusable roles
+                inert: loading ? "true" : "false", // Use inert when loading
+              },
+            }}
             sx={{
               "& .MuiDataGrid-columnHeaders": {
                 position: "sticky",
@@ -351,6 +408,13 @@ const AdminDashboard = () => {
                   fontWeight: 700,
                   fontSize: "0.9rem",
                 },
+              },
+              "& .MuiDataGrid-verticalScroller": {
+                overflowX: "auto !important", // Enable horizontal scrolling
+              },
+              "& .MuiDataGrid-scrollbar": {
+                visibility: loading ? "hidden" : "visible", // Hide scrollbars during loading
+                pointerEvents: loading ? "none" : "auto", // Prevent interaction during loading
               },
             }}
           />
