@@ -9,7 +9,7 @@ connectDB();
 const app = express();
 app.use(cors(
     {
-        origin: ['https://optiview-server.onrender.com','http://localhost:3000']  // Replace with your front-end's domain
+        origin: ['https://optiview-client.onrender.com','http://localhost:3000']  // Replace with your front-end's domain
       }
 ));
 app.use(express.json());
