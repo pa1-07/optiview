@@ -1,4 +1,4 @@
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://optiview-server.onrender.com/api";
+const BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 export const API = {
   ADMIN_LOGIN: `${BASE_URL}/auth/admin/login`,
