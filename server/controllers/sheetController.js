@@ -126,6 +126,7 @@ exports.getAllData = async (req, res) => {
       return res.status(404).json({ message: "Sheet not found" });
     }
 
+
     // Return all data
     res.json({
       data: sheet.data,
@@ -167,20 +168,23 @@ exports.addRow = async (req, res) => {
 
   try {
     const sheet = await Sheet.findById(sheetId);
-
     if (!sheet) {
-      return res.status(404).json({ message: 'Sheet not found' });
+      return res.status(404).json({ message: "Sheet not found" });
     }
 
-    sheet.data.push(row);
+    // Ensure row has a unique ID before adding
+    const newRow = { id: new mongoose.Types.ObjectId().toString(), ...row };
+
+    sheet.data.push(newRow);
     await sheet.save();
 
-    res.status(201).json({ message: 'Row added successfully', row });
+    res.status(201).json({ message: "Row added successfully", row: newRow });
   } catch (error) {
-    console.error('Error adding row:', error.message);
-    res.status(500).json({ message: 'Error adding row' });
+    console.error("Error adding row:", error.message);
+    res.status(500).json({ message: "Error adding row" });
   }
 };
+
 
 // Delete Row
 exports.deleteRow = async (req, res) => {
@@ -212,4 +216,30 @@ exports.deleteSheet = async (req, res) => {
     res.status(500).json({ message: "Error deleting sheet", error });
   }
 };
+
+// Update Row
+exports.updateRow = async (req, res) => {
+  const { sheetId, rowIndex } = req.params;
+  const { updatedRow } = req.body;
+
+  try {
+    const sheet = await Sheet.findById(sheetId);
+    if (!sheet) {
+      return res.status(404).json({ message: "Sheet not found" });
+    }
+
+    if (rowIndex < 0 || rowIndex >= sheet.data.length) {
+      return res.status(400).json({ message: "Invalid row index" });
+    }
+
+    sheet.data[rowIndex] = updatedRow;
+    await sheet.save();
+
+    res.json({ message: "Row updated successfully", updatedRow });
+  } catch (error) {
+    console.error("Error updating row:", error.message);
+    res.status(500).json({ message: "Error updating row" });
+  }
+};
+
 

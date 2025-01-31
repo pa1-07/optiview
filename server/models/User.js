@@ -6,6 +6,7 @@ const userSchema = mongoose.Schema(
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["admin", "client"], default: "client" },
+    assignedSheets: [{type: mongoose.Schema.Types.ObjectId, ref:"Sheet"}]
   },
   { timestamps: true }
 );

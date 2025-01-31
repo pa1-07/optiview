@@ -8,6 +8,7 @@ import AdminPage from './pages/AdminPage';
 import ClientPage from './pages/ClientPage';
 import AuthForm from './components/AuthForm';
 import useAnimatedFavicon from "./hooks/useAnimatedFavicon";
+import AdminAccessPage from './pages/AdminAccessPage';
 
 function App() {
   useAnimatedFavicon();
@@ -17,6 +18,7 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={<AdminLoginPage />} />
         <Route path="/signup" element={<AuthForm />} />
+        <Route path="/admin/access" element={<AdminAccessPage />} />
 
         {/* Protected Admin Route */}
         <Route

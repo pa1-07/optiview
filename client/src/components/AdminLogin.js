@@ -53,7 +53,7 @@ const AdminLoginPage = () => {
       sx={{  mb: 8 }}
     >
       <Paper elevation={3} style={{ padding: '60px', width: '350px' }}>
-        <Typography variant="h5" align="center" gutterBottom>
+        <Typography variant="h5" align="center" gutterBottom style={{fontWeight: 'bold'}}>
           Admin Login
         </Typography>
         {error && (

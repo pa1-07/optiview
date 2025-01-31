@@ -31,22 +31,58 @@ exports.adminLogin = (req, res) => {
   }
 };
 
-// Client Signup Logic
 exports.signup = async (req, res) => {
+  const { name, email, password } = req.body;
+
+  try {
+    // Check if user with the same email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role: 'client',
+    });
+
+    await user.save();
+    res.status(201).json({ message: 'Client registered successfully' });
+  } catch (error) {
+    console.error('Error during signup:', error.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+exports.clientLogin = async (req, res) => {
   const { name, password } = req.body;
 
-  const existingUser = await User.findOne({ name });
-  if (existingUser) {
-    return res.status(400).json({ message: 'Name already registered' });
+  try {
+    const user = await User.findOne({ name });
+    if (!user) {
+      return res.status(400).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, name: user.name, role: user.role },
+      process.env.SECRET_KEY,
+      { expiresIn: '1d' }
+    );
+
+    res.status(200).json({ token, role: user.role });
+  } catch (error) {
+    console.error('Error during login:', error.message);
+    res.status(500).json({ message: 'Server Error' });
   }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({
-    name,
-    password: hashedPassword,
-    role: 'client', // Automatically assign the client role
-  });
-
-  await user.save();
-  res.status(201).json({ message: 'Client registered successfully' });
 };
+
+

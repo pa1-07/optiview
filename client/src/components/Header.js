@@ -9,7 +9,11 @@ const Header = () => {
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate("/");
+    if (role === "client") {
+      navigate("/signup");
+    } else {
+      navigate("/");
+    }
   };
 
   return (
@@ -52,6 +56,7 @@ const Header = () => {
           {/* Buttons: Admin, Client, and Logout */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             {role === "admin" && (
+              <>
               <Button
                 component={Link}
                 to="/admin"
@@ -70,6 +75,27 @@ const Header = () => {
               >
                 Admin
               </Button>
+
+              <Button
+                component={Link}
+                to="/admin/access"
+                sx={{
+                  color: "#FFFFFF",
+                  fontWeight: 500,
+                  fontFamily: "Poppins, sans-serif",
+                  textTransform: "none",
+                  fontSize: "0.9rem",
+                  ":hover": {
+                    color: "#FFB74D",
+                    backgroundColor: "rgba(255, 183, 77, 0.1)",
+                  },
+                  transition: "all 0.3s ease",
+                }}
+              >
+                Access
+              </Button>
+
+              </>
             )}
             {role === "client" && (
               <Button

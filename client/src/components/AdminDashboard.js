@@ -13,8 +13,14 @@ import {
   TextField,
   Modal,
 } from "@mui/material";
-import { DataGrid  } from "@mui/x-data-grid";
-import { Upload, Download, Delete, Search } from "@mui/icons-material";
+import { DataGrid } from "@mui/x-data-grid";
+import {
+  Upload,
+  Download,
+  Delete,
+  Search,
+  DeleteOutline,
+} from "@mui/icons-material";
 import api from "../services/apiService";
 import { API } from "../services/apiEndpoints";
 
@@ -25,7 +31,9 @@ const AdminDashboard = () => {
   const [search, setSearch] = useState(""); // Row-level search
   const [sheetId, setSheetId] = useState("");
   const [allSheets, setAllSheets] = useState([]);
- 
+  const [openDeleteRowModal, setOpenDeleteRowModal] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState(null);
+  const [deletingRow, setDeletingRow] = useState(false);
 
   const [dropdownSearch, setDropdownSearch] = useState(""); // Sheet dropdown search
   const [snackbar, setSnackbar] = useState({
@@ -66,14 +74,52 @@ const AdminDashboard = () => {
         id: `${sheetId}-${index}`, // Unique ID for each row
       }));
 
-      setAllData(updatedRows); // Store all rows
-      setColumns(
-        data.columns.map((col) => ({
-          field: col,
-          headerName: col,
-          flex: 1,
-        }))
-      );
+      // Define columns and append the "Actions" column separately
+      const tableColumns = data.columns.map((col) => ({
+        field: col,
+        headerName: col,
+        flex: 1,
+        editable: true,
+      }));
+
+      tableColumns.push({
+        field: "actions",
+        headerName: "Actions",
+        width: 120,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params) => (
+          <Button
+            size="small"
+            variant="outlined"
+            sx={{
+              color: "#d32f2f", // Professional red color
+              borderColor: "#d32f2f", // Border to match color
+              fontSize: "0.75rem", // Smaller font size for a sleek look
+              padding: "3px 6px", // Slightly reduce padding
+              textTransform: "none", // Avoid all uppercase text
+              borderRadius: "6px", // Soft rounded edges
+              transition: "all 0.3s ease-in-out", // Smooth hover transition
+              "&:hover": {
+                backgroundColor: "#fbe9e7", // Light red hover background
+                borderColor: "#b71c1c", // Darker red border on hover
+                color: "#b71c1c", // Darker red text on hover
+              },
+            }}
+            onClick={() => {
+              setOpenDeleteRowModal(true);
+              setRowToDelete(params.row.id);
+            }}
+            startIcon={<DeleteOutline sx={{ fontSize: "1rem" }} />} // Reduce icon size slightly
+          >
+            Delete
+          </Button>
+        ),
+      });
+
+      setAllData(updatedRows);
+      setColumns(tableColumns);
     } catch (error) {
       setSnackbar({
         open: true,
@@ -84,6 +130,36 @@ const AdminDashboard = () => {
       setLoading(false);
     }
   }, [sheetId]);
+
+  const handleDeleteRow = async () => {
+    try {
+      setDeletingRow(true); //Start loading state
+      const rowIndex = allData.findIndex((row) => row.id === rowToDelete);
+      if (rowIndex === -1) return;
+
+      await api.delete(API.DELETE_ROW(sheetId, rowIndex));
+
+      setAllData((prevData) =>
+        prevData.filter((row, index) => index !== rowIndex)
+      );
+
+      setSnackbar({
+        open: true,
+        message: "Row deleted successfully",
+        severity: "success",
+      });
+      setOpenDeleteRowModal(false);
+    } catch (error) {
+      console.error("Error deleting row:", error.message);
+      setSnackbar({
+        open: true,
+        message: "Failed to delete row",
+        severity: "error",
+      });
+    } finally {
+      setDeletingRow(false); // Stop loading state
+    }
+  };
 
   // Filter sheets based on dropdown search
   const getFilteredSheets = useCallback(() => {
@@ -169,6 +245,64 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleRowUpdate = async (updatedRow, oldRow) => {
+    try {
+      const rowIndex = allData.findIndex((row) => row.id === oldRow.id);
+      if (rowIndex === -1) return oldRow; // If row not found, return the old one
+
+      await api.put(API.UPDATE_ROW(sheetId, rowIndex), { updatedRow });
+
+      setAllData((prevData) =>
+        prevData.map((row, index) => (index === rowIndex ? updatedRow : row))
+      );
+
+      setSnackbar({
+        open: true,
+        message: "Row updated successfully",
+        severity: "success",
+      });
+
+      return updatedRow;
+    } catch (error) {
+      console.error("Error updating row:", error.message);
+      setSnackbar({
+        open: true,
+        message: "Failed to update row",
+        severity: "error",
+      });
+      return oldRow;
+    }
+  };
+
+  const handleAddRow = async () => {
+    try {
+      // Generate a unique ID for the new row
+      const newRow = {
+        id: `new-${Date.now()}`, // Ensure unique ID
+        ...Object.fromEntries(columns.map((col) => [col.field, ""])), // Empty row
+      };
+
+      // Send the new row to the backend to store it
+      const { data } = await api.post(API.ADD_ROW(sheetId), { row: newRow });
+
+      // Update UI with the new row from backend response
+      setAllData((prevData) => [data.row, ...prevData]);
+
+      setSnackbar({
+        open: true,
+        message: "Row added successfully",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Error adding row:", error.message);
+      setSnackbar({
+        open: true,
+        message: "Failed to add row",
+        severity: "error",
+      });
+    }
+  };
+
   const handleDownload = async () => {
     if (!sheetId) {
       setSnackbar({
@@ -178,7 +312,7 @@ const AdminDashboard = () => {
       });
       return;
     }
-  
+
     try {
       // Get filtered and sorted rows
       const visibleRows = getFilteredRows(); // Use the existing function to get the visible rows
@@ -188,7 +322,7 @@ const AdminDashboard = () => {
           return acc;
         }, {})
       );
-  
+
       // Convert data to CSV format
       const csvContent = [
         columns.map((col) => col.headerName).join(","), // Header row
@@ -196,7 +330,7 @@ const AdminDashboard = () => {
           columns.map((col) => JSON.stringify(row[col.headerName])).join(",")
         ), // Data rows
       ].join("\n");
-  
+
       // Create a Blob and trigger download
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
@@ -206,7 +340,7 @@ const AdminDashboard = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-  
+
       setSnackbar({
         open: true,
         message: "File downloaded successfully",
@@ -221,8 +355,6 @@ const AdminDashboard = () => {
       });
     }
   };
-  
-  
 
   return (
     <Box
@@ -322,6 +454,81 @@ const AdminDashboard = () => {
           />
         </Box>
 
+        <Modal
+          open={openDeleteRowModal}
+          onClose={() => setOpenDeleteRowModal(false)}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              top: "40%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              bgcolor: "background.paper",
+              border: "1px solid #ccc",
+              boxShadow: 24,
+              p: 4,
+              width: 300,
+              borderRadius: "8px",
+            }}
+          >
+            <Typography variant="h6">Confirm Row Deletion</Typography>
+            <Typography sx={{ mt: 2 }}>
+              Are you sure you want to delete this row?
+            </Typography>
+            <Box sx={{ mt: 4, display: "flex", justifyContent: "flex-end" }}>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleDeleteRow}
+                disabled={deletingRow} // Disable button when loading
+                sx={{
+                  minWidth: "80px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {deletingRow ? (
+                  <CircularProgress size={20} sx={{ color: "#fff", mr: 1 }} />
+                ) : (
+                  "Yes"
+                )}
+              </Button>
+              <Button
+                variant="outlined"
+                sx={{ ml: 2 }}
+                onClick={() => setOpenDeleteRowModal(false)}
+                disabled={deletingRow} // Prevent closing while deleting
+              >
+                No
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
+
+        <Button
+          variant="contained"
+          size="small"
+          color="success"
+          style={{ minWidth: "80px" }}
+          onClick={handleAddRow}
+          sx={{
+            ml: 70,
+            backgroundColor: "#2E5077", // Elegant deep blue-gray
+            color: "#ECF0F1", // Light text for contrast
+            fontWeight: "bold", // Make text stand out
+            textTransform: "none", // Remove uppercase style for a clean look
+            borderRadius: "6px", // Slightly rounded corners
+            padding: "6px 16px", // Comfortable padding
+            "&:hover": {
+              backgroundColor: "#2C3E50", // Darker shade on hover
+            },
+          }}
+        >
+          ADD ROW
+        </Button>
+
         <Box display="flex" gap={1}>
           <Button
             variant="contained"
@@ -389,6 +596,9 @@ const AdminDashboard = () => {
             rowsPerPageOptions={[100]}
             autoHeight={false}
             disableExtendRowFullWidth
+            editMode="cell"
+            processRowUpdate={handleRowUpdate}
+            experimentalFeatures={{ newEditingApi: true }}
             componentsProps={{
               basePopper: {
                 disablePortal: true, // Ensure no portal-based detachments
@@ -408,6 +618,18 @@ const AdminDashboard = () => {
                   fontWeight: 700,
                   fontSize: "0.9rem",
                 },
+              },
+              "& .MuiDataGrid-columnHeader[data-field='actions']": {
+                position: "sticky",
+                right: 0,
+                //backgroundColor: "#f1f1f1",
+                zIndex: 1,
+              },
+              "& .MuiDataGrid-cell[data-field='actions']": {
+                position: "sticky",
+                right: 0,
+                backgroundColor: "#fff",
+                zIndex: 1,
               },
               "& .MuiDataGrid-verticalScroller": {
                 overflowX: "auto !important", // Enable horizontal scrolling
